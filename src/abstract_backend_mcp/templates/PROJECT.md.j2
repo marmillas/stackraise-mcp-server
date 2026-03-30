@@ -1,0 +1,34 @@
+---
+name: {{ project_name }}
+description: ""
+stack:
+{%- if has_fastapi %}
+  - FastAPI
+{%- endif %}
+{%- if has_mongodb %}
+  - MongoDB
+{%- endif %}
+{%- if has_stackraise %}
+  - Stackraise
+{%- endif %}
+{%- if has_poetry %}
+  - Poetry
+{%- endif %}
+conventions: []
+---
+
+## Objetivo
+
+<!-- Describe the purpose of this project. This text is sent to the MCP agent as context. -->
+
+## Arquitectura
+
+<!-- Describe the high-level architecture: modules, layers, key directories. -->
+
+## Convenciones
+
+<!-- List coding conventions, naming rules, or patterns the agent should follow. -->
+
+## Notas para el agente
+
+<!-- Any special instructions: files to avoid, confirmation requirements, known gotchas. -->

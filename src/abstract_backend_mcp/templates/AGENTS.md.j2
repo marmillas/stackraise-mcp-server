@@ -1,0 +1,28 @@
+# AGENTS.md – {{ project_name }}
+
+## plan
+
+**Role**: Read-only analysis and planning.
+
+- No file edits
+- No MongoDB writes
+- Can run tests, inspect routes, read context
+- Should start sessions with `build_stackraise_context_snapshot`
+
+## build
+
+**Role**: Implementation with controlled writes.
+
+- File edits allowed (under confirmation)
+- Tests and quality tools available
+- MongoDB writes possible if settings allow
+- Should use context snapshot before modifying code
+
+## audit
+
+**Role**: Review, quality and security assessment.
+
+- No file edits
+- No MongoDB writes
+- Focus on quality checks, config review, risk detection
+- Should report context gaps and secret exposure risks

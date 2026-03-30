@@ -1,0 +1,50 @@
+[tool.poetry]
+name = "abstract-backend-mcp"
+version = "0.1.0"
+description = "Reusable MCP server for Python backend development with FastAPI, MongoDB and Stackraise support"
+authors = ["Stackraise Team"]
+readme = "README.md"
+packages = [{include = "abstract_backend_mcp", from = "src"}]
+
+[tool.poetry.scripts]
+abstract-mcp = "abstract_backend_mcp.main:cli"
+
+[tool.poetry.dependencies]
+python = ">=3.12,<4.0"
+pydantic = ">=2.0"
+pydantic-settings = ">=2.0"
+mcp = {version = ">=1.0", extras = ["cli"]}
+pymongo = ">=4.0"
+pyyaml = ">=6.0"
+jinja2 = ">=3.1"
+click = ">=8.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = ">=7.0"
+pytest-asyncio = ">=0.21"
+ruff = ">=0.4"
+pyright = ">=1.1"
+fastapi = ">=0.100"
+httpx = ">=0.24"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM"]
+
+[tool.pyright]
+pythonVersion = "3.12"
+typeCheckingMode = "basic"
+venvPath = "."
+venv = ".venv"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"

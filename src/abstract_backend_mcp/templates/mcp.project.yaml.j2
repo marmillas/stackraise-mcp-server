@@ -1,0 +1,24 @@
+# MCP project configuration for {{ project_name }}
+project_name: "{{ project_name }}"
+environment: development
+{% if fastapi_app_path %}
+fastapi_app_path: "{{ fastapi_app_path }}"
+{% endif %}
+enable_fastapi_tools: {{ has_fastapi | lower }}
+enable_mongodb_tools: {{ has_mongodb | lower }}
+enable_stackraise_tools: {{ has_stackraise | lower }}
+enable_test_tools: true
+enable_quality_tools: true
+
+mongodb_uri: "mongodb://localhost:27017"
+mongodb_db_name: "{{ project_name }}"
+
+stackraise_enabled: {{ has_stackraise | lower }}
+stackraise_context_mode: hybrid
+
+allow_write_operations: false
+require_write_confirmation: true
+allowed_write_collections: []
+
+redact_sensitive_fields: true
+max_output_items: 50

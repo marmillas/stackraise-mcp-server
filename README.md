@@ -50,12 +50,22 @@ The MCP lives in its own repo. Your project only needs a client config file (e.g
 
 ```jsonc
 {
-  "mcpServers": {
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
     "abstract-mcp": {
-      "command": "poetry",
-      "args": ["run", "abstract-mcp", "serve", "--config", "/path/to/your-project/mcp.project.yaml"],
-      "cwd": "/path/to/coding-mcp",
-      "env": {
+      "type": "local",
+      "command": [
+        "poetry",
+        "-C",
+        "/path/to/coding-mcp",
+        "run",
+        "abstract-mcp",
+        "serve",
+        "--config",
+        "/path/to/your-project/mcp.project.yaml"
+      ],
+      "enabled": true,
+      "environment": {
         "PROJECT_NAME": "my-app",
         "PROJECT_ROOT": "/path/to/your-project",
         "FASTAPI_APP_PATH": "src.main:app"
@@ -73,7 +83,7 @@ The MCP lives in its own repo. Your project only needs a client config file (e.g
 From your project directory:
 
 ```bash
-poetry add --group dev abstract-backend-mcp --path /path/to/coding-mcp
+poetry add --group dev /path/to/coding-mcp
 ```
 
 Then you can run the CLI directly inside your project:
@@ -87,11 +97,12 @@ And point your client config to the project itself:
 
 ```jsonc
 {
-  "mcpServers": {
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
     "abstract-mcp": {
-      "command": "poetry",
-      "args": ["run", "abstract-mcp", "serve"],
-      "cwd": "/path/to/your-project"
+      "type": "local",
+      "command": ["poetry", "run", "abstract-mcp", "serve"],
+      "enabled": true
     }
   }
 }
@@ -276,11 +287,12 @@ After running `abstract-mcp init`, use the generated `opencode.jsonc`:
 
 ```jsonc
 {
-  "mcpServers": {
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
     "abstract-mcp": {
-      "command": "poetry",
-      "args": ["run", "abstract-mcp", "serve"],
-      "cwd": "/path/to/this/repo"
+      "type": "local",
+      "command": ["poetry", "run", "abstract-mcp", "serve"],
+      "enabled": true
     }
   }
 }

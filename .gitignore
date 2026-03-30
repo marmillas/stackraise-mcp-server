@@ -38,3 +38,10 @@ Thumbs.db
 
 # Pyright
 pyrightconfig.json
+
+# MCP
+AGENTS.md
+mcp.project.yaml
+opencode.jsonc
+PROJECT.md
+.env.example

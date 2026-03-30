@@ -1,10 +1,11 @@
 {
+  "$schema": "https://opencode.ai/config.json",
   // OpenCode MCP configuration for {{ project_name }}
-  "mcpServers": {
+  "mcp": {
     "abstract-mcp": {
-      "command": "poetry",
-      "args": ["run", "abstract-mcp", "serve"],
-      "cwd": "{{ root }}"
+      "type": "local",
+      "command": ["poetry", "run", "abstract-mcp", "serve"],
+      "enabled": true
     }
   }
 }

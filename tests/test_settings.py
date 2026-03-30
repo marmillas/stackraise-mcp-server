@@ -11,7 +11,19 @@ def test_defaults():
     assert s.environment == "development"
     assert s.allow_write_operations is False
     assert s.redact_sensitive_fields is True
+    assert s.allow_fastapi_runtime_imports is False
+    assert s.mongodb_sample_max_documents == 20
     assert s.stackraise_context_mode == ContextMode.HYBRID
+    assert s.allow_runtime_context_imports is False
+    assert s.enable_deep_stackraise_context is True
+    assert s.max_source_chunk_lines == 200
+    assert s.max_total_snapshot_items == 500
+    assert s.stackraise_search_max_pattern_length == 200
+    assert s.stackraise_search_timeout_ms == 500
+    assert s.stackraise_search_max_scanned_lines == 20000
+    assert s.stackraise_context_cache_ttl_seconds == 30
+    assert s.stackraise_context_cache_max_entries == 32
+    assert s.stackraise_context_fingerprint_ttl_seconds == 1
 
 
 def test_env_override(monkeypatch):
@@ -33,7 +45,11 @@ def test_yaml_override(tmp_path):
 
 
 def test_sanitized_dict():
-    s = MCPSettings(_env_file=None, mongodb_uri="mongodb://secret:pass@host/db")
+    s = MCPSettings(
+        _env_file=None,
+        project_name="token=abc123",
+        mongodb_uri="mongodb://secret:pass@host/db",
+    )
     d = s.sanitized_dict()
     assert d["mongodb_uri"] == "***REDACTED***"
-    assert d["project_name"] == "my-project"
+    assert d["project_name"] == "token=***REDACTED***"

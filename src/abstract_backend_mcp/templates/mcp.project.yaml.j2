@@ -5,6 +5,7 @@ environment: development
 fastapi_app_path: "{{ fastapi_app_path }}"
 {% endif %}
 enable_fastapi_tools: {{ has_fastapi | lower }}
+allow_fastapi_runtime_imports: false
 enable_mongodb_tools: {{ has_mongodb | lower }}
 enable_stackraise_tools: {{ has_stackraise | lower }}
 enable_test_tools: true
@@ -12,9 +13,19 @@ enable_quality_tools: true
 
 mongodb_uri: "mongodb://localhost:27017"
 mongodb_db_name: "{{ project_name }}"
+mongodb_sample_max_documents: 20
 
-stackraise_enabled: {{ has_stackraise | lower }}
 stackraise_context_mode: hybrid
+allow_runtime_context_imports: false
+enable_deep_stackraise_context: true
+max_source_chunk_lines: 200
+max_total_snapshot_items: 500
+stackraise_search_max_pattern_length: 200
+stackraise_search_timeout_ms: 500
+stackraise_search_max_scanned_lines: 20000
+stackraise_context_cache_ttl_seconds: 30
+stackraise_context_cache_max_entries: 32
+stackraise_context_fingerprint_ttl_seconds: 1
 
 allow_write_operations: false
 require_write_confirmation: true

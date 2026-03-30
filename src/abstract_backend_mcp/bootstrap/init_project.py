@@ -27,6 +27,7 @@ def run_init(target_dir: str = ".", dry_run: bool = False) -> list[str]:
     Returns list of file paths that were written (or would be written in dry-run).
     """
     root = Path(target_dir).resolve()
+    root.mkdir(parents=True, exist_ok=True)
     info = detect_project(root)
 
     env = Environment(

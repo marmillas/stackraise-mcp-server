@@ -24,11 +24,8 @@ def extract_runtime_context(
     warnings: list[str] = []
     context: dict[str, Any] = {}
 
-    # Modules
-    if adapter.is_available():
-        context["modules"] = adapter.detect_modules()
-    else:
-        context["modules"] = {}
+    # Modules availability warning (module/symbol merge is handled by provider)
+    if not adapter.is_available():
         warnings.append("Stackraise package not importable – skipping runtime extraction")
 
     # DB metadata

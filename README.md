@@ -160,13 +160,27 @@ Settings are loaded from (in order of priority):
 | `ENVIRONMENT` | `development` | Current environment |
 | `FASTAPI_APP_PATH` | `app.main:app` | Python import path of the FastAPI app |
 | `MONGODB_URI` | `mongodb://localhost:27017` | MongoDB connection string |
+| `MONGODB_SAMPLE_MAX_DOCUMENTS` | `20` | Maximum number of sampled documents returned by MongoDB tools |
 | `ENABLE_FASTAPI_TOOLS` | `true` | Enable FastAPI tools |
+| `ALLOW_FASTAPI_RUNTIME_IMPORTS` | `false` | Allow importing FastAPI runtime app for route/OpenAPI inspection |
 | `ENABLE_MONGODB_TOOLS` | `true` | Enable MongoDB tools |
 | `ENABLE_STACKRAISE_TOOLS` | `false` | Enable Stackraise tools |
+| `ENABLE_DEEP_STACKRAISE_CONTEXT` | `true` | Enable deep module/symbol indexing |
 | `ALLOW_WRITE_OPERATIONS` | `false` | Allow MongoDB writes |
 | `REQUIRE_WRITE_CONFIRMATION` | `true` | Require explicit `confirmed=True` |
 | `ALLOWED_WRITE_COLLECTIONS` | `[]` | Collection allowlist (empty = all) |
 | `STACKRAISE_CONTEXT_MODE` | `hybrid` | Extraction mode: `static`, `runtime`, `hybrid` |
+| `ALLOW_RUNTIME_CONTEXT_IMPORTS` | `false` | Allow live runtime imports during context extraction |
+| `STACKRAISE_MODULE_ROOTS` | `[]` | Optional glob roots for Stackraise packages |
+| `MAX_SOURCE_CHUNK_LINES` | `200` | Max lines returned by source-oriented tools |
+| `MAX_TOTAL_SNAPSHOT_ITEMS` | `500` | Global cap for deep snapshot inventories |
+| `MAX_OUTPUT_ITEMS` | `50` | Max items returned by paginated Stackraise tools |
+| `STACKRAISE_SEARCH_MAX_PATTERN_LENGTH` | `200` | Max accepted length for `search_stackraise_code` pattern |
+| `STACKRAISE_SEARCH_TIMEOUT_MS` | `500` | Search timeout budget in milliseconds |
+| `STACKRAISE_SEARCH_MAX_SCANNED_LINES` | `20000` | Max total scanned lines for code search |
+| `STACKRAISE_CONTEXT_CACHE_TTL_SECONDS` | `30` | Cache TTL for Stackraise context provider |
+| `STACKRAISE_CONTEXT_CACHE_MAX_ENTRIES` | `32` | Max in-memory context cache entries |
+| `STACKRAISE_CONTEXT_FINGERPRINT_TTL_SECONDS` | `1` | TTL for project fingerprint reuse before rescanning files |
 | `REDACT_SENSITIVE_FIELDS` | `true` | Redact secrets in all output |
 | `PROJECT_INSTRUCTIONS_FILE` | `PROJECT.md` | Path to project instructions file |
 
@@ -247,18 +261,41 @@ The tool `show_project_instructions` lets the agent re-read the parsed PROJECT.m
 ### FastAPI
 - `list_routes`, `find_route`, `show_openapi_summary`
 
+When `ALLOW_FASTAPI_RUNTIME_IMPORTS=false`, FastAPI introspection tools return a blocked error envelope.
+
 ### MongoDB
 - **Readonly**: `list_collections`, `sample_documents`, `count_documents`, `show_indexes`
 - **Writes**: `insert_one_controlled`, `update_one_controlled`, `delete_one_controlled`
+
+MongoDB sample responses are bounded by `MONGODB_SAMPLE_MAX_DOCUMENTS` and respect
+`REDACT_SENSITIVE_FIELDS` for textual/key-based redaction.
 
 ### Stackraise
 - `detect_stackraise`, `show_stackraise_modules`
 - `show_stackraise_db_metadata`, `show_stackraise_auth_scopes`
 - `list_stackraise_crud_resources`, `list_stackraise_workflows`
+- `list_stackraise_module_tree`, `list_stackraise_modules`
+- `show_stackraise_module_symbols`, `show_stackraise_symbol_source`
+- `read_stackraise_module_chunk`, `search_stackraise_code` (`use_regex=false` by default)
 - `build_stackraise_context_snapshot` – full context with schema:
   - `project`, `stackraise.modules`, `stackraise.domain`, `stackraise.api`
   - `stackraise.auth`, `stackraise.workflows`, `stackraise.frontend_contracts`
   - `security` (redacted, warnings), `extraction` (mode, fallback, warnings)
+
+### Recommended Stackraise flow
+
+Use navigation in this order to keep responses compact and deterministic:
+
+1. `build_stackraise_context_snapshot(mode="hybrid")`
+2. `list_stackraise_module_tree()`
+3. `show_stackraise_module_symbols(module="stackraise.some_module")`
+4. `show_stackraise_symbol_source(symbol_id="...")` or `read_stackraise_module_chunk(...)`
+
+For large codebases, prefer bounded tree navigation with
+`list_stackraise_module_tree(parent_module="stackraise", depth=0, limit=50)`.
+By default, `list_stackraise_module_tree` uses `depth=0` to avoid returning deep subtrees.
+
+This workflow follows `snapshot -> tree -> symbols -> source` and avoids large payloads.
 
 ## Write Operation Policy
 
@@ -274,12 +311,17 @@ All MongoDB writes are gated by:
 | Mode | Behavior |
 |---|---|
 | `static` | AST analysis of source files, no imports |
-| `runtime` | Live introspection of imported modules |
-| `hybrid` | Runtime with automatic fallback to static |
+| `runtime` | Live introspection of imported modules (requires `ALLOW_RUNTIME_CONTEXT_IMPORTS=true`) |
+| `hybrid` | Runtime with automatic fallback to static (runtime disabled by policy by default) |
 
 ## Secret Redaction
 
-When `REDACT_SENSITIVE_FIELDS=true` (default), all context output is scanned for keys matching patterns like `password`, `secret`, `token`, `api_key`, etc., and their values are replaced with `***REDACTED***`.
+When `REDACT_SENSITIVE_FIELDS=true` (default), context output is redacted in two layers:
+
+- key-based redaction (`password`, `secret`, `token`, `api_key`, etc.)
+- textual redaction for symbol/source content (docstrings, literals, bearer/query tokens)
+
+Sensitive values are replaced with `***REDACTED***`.
 
 ## OpenCode Integration
 
@@ -306,7 +348,7 @@ Agent roles (see generated `AGENTS.md`):
 ## Limitations (v1)
 
 - No HTTP/SSE transport (stdio only)
-- No cross-module dependency tracing
+- Dependency tracing is static and best-effort (import graph only)
 - Stackraise introspection is best-effort and defensive
 - No advanced RPA analysis beyond detection
 - MongoDB adapter uses pymongo (no async motor)

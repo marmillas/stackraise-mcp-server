@@ -48,5 +48,22 @@ def test_snapshot_schema_stability(tmp_path):
     assert set(snapshot.keys()) == expected_keys
 
     sr = snapshot["stackraise"]
-    expected_sr_keys = {"modules", "domain", "api", "auth", "workflows", "frontend_contracts"}
+    expected_sr_keys = {
+        "modules",
+        "domain",
+        "api",
+        "auth",
+        "workflows",
+        "frontend_contracts",
+    }
     assert set(sr.keys()) == expected_sr_keys
+
+    module_keys = {
+        "detected",
+        "module_tree",
+        "module_index",
+        "symbol_index",
+        "dependency_edges",
+        "content_catalog",
+    }
+    assert set(sr["modules"].keys()) == module_keys

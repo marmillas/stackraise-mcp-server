@@ -13,4 +13,4 @@ def test_server_creates_without_error():
     )
     server = create_server(settings)
     assert server is not None
-    assert settings.project_name in server.name
+    assert server.name.startswith("abstract-mcp (")

@@ -53,7 +53,7 @@ class FastAPIAdapter:
         app = self.load_app()
         schema_fn = getattr(app, "openapi", None)
         if schema_fn is None:
-            return {"error": "App does not expose openapi()"}
+            raise DependencyNotAvailableError("App does not expose openapi()")
         try:
             schema = schema_fn()
             return {
@@ -63,4 +63,6 @@ class FastAPIAdapter:
                 "tags": [t.get("name") for t in schema.get("tags", [])],
             }
         except Exception as exc:
-            return {"error": str(exc)}
+            raise DependencyNotAvailableError(
+                f"Could not build OpenAPI summary: {exc}"
+            ) from exc

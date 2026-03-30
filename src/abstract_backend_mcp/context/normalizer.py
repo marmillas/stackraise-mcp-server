@@ -11,7 +11,8 @@ from abstract_backend_mcp.context.extractors_static import (
     find_document_classes,
     find_fastapi_routers,
 )
-from abstract_backend_mcp.context.redaction import check_security_warnings, redact_dict
+from abstract_backend_mcp.context.provider import StackraiseContextProvider
+from abstract_backend_mcp.context.redaction import check_security_warnings, sanitize_output_payload
 from abstract_backend_mcp.context.schemas import (
     APIContext,
     AuthContext,
@@ -22,7 +23,6 @@ from abstract_backend_mcp.context.schemas import (
     ProjectContext,
     SecurityContext,
     StackraiseContext,
-    StackraiseModules,
     WorkflowContext,
 )
 from abstract_backend_mcp.core.logging import get_logger
@@ -62,6 +62,14 @@ def build_snapshot(
     routers = find_fastapi_routers(root, settings.stackraise_api_globs)
     frontend_pkgs = detect_frontend_packages(root) if settings.include_frontend_context else []
     workflow_files = detect_workflow_files(root)
+    provider = StackraiseContextProvider(settings, adapter)
+    module_inventory, module_warnings, module_fallback = provider.get_modules_context(
+        mode=mode,
+        include_source=False,
+        apply_budget=True,
+    )
+    warnings.extend(module_warnings)
+    fallback_used = fallback_used or module_fallback
 
     domain = DomainContext(documents=documents)
     api = APIContext(crud_resources=[], routes=[], openapi_summary={})
@@ -75,15 +83,14 @@ def build_snapshot(
         detected=bool(frontend_pkgs),
         packages=frontend_pkgs,
     )
-    modules = StackraiseModules()
+    modules = module_inventory.model_copy(deep=True)
 
     # --- runtime extraction (if mode allows) ---
-    if mode in ("runtime", "hybrid"):
+    if mode in ("runtime", "hybrid") and settings.allow_runtime_context_imports:
         try:
             from abstract_backend_mcp.context.extractors_runtime import extract_runtime_context
 
             rt = extract_runtime_context(settings, adapter)
-            modules = StackraiseModules(detected=rt.get("modules", {}))
             auth_data = rt.get("auth", {})
             auth = AuthContext(available=auth_data.get("available", False))
             api = APIContext(
@@ -106,13 +113,6 @@ def build_snapshot(
         ]
         if mode == "hybrid":
             warnings.append("Using static API detection as fallback")
-
-    # If pure static, detect modules via adapter anyway (safe)
-    if mode == "static":
-        try:
-            modules = StackraiseModules(detected=adapter.detect_modules())
-        except Exception:
-            warnings.append("Module detection failed in static mode")
 
     # --- security ---
     sec_warnings = check_security_warnings(root)
@@ -142,7 +142,9 @@ def build_snapshot(
 
     output = snapshot.model_dump()
 
-    if settings.redact_sensitive_fields:
-        output = redact_dict(output)
+    output = sanitize_output_payload(
+        output,
+        redaction_enabled=settings.redact_sensitive_fields,
+    )
 
     return output

@@ -4,7 +4,73 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
+
+
+class ModuleTreeNode(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    name: str = ""
+    module: str = ""
+    module_id: str = ""
+    kind: str = ""
+    path: str = ""
+    children: list[ModuleTreeNode] = Field(default_factory=list)
+
+
+class ModuleIndexEntry(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    module_id: str = ""
+    module: str = ""
+    package: str = ""
+    path: str = ""
+    kind: str = ""
+    source: str = ""
+    line_count: int = 0
+    hash: str = ""
+
+
+class SymbolIndexEntry(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    symbol_id: str = ""
+    module_id: str = ""
+    module: str = ""
+    name: str = ""
+    qualname: str = ""
+    kind: str = ""
+    source: str = ""
+    line: int = 0
+    end_line: int = 0
+    path: str = ""
+
+
+class DependencyEdgeEntry(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    edge_id: str = ""
+    source_module_id: str = ""
+    source_module: str = ""
+    target: str = ""
+    line: int = 0
+    kind: str = ""
+    source: str = ""
+    internal: bool = False
+
+
+class ContentChunkEntry(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    chunk_id: str = ""
+    module_id: str = ""
+    module: str = ""
+    path: str = ""
+    source: str = ""
+    start_line: int = 0
+    end_line: int = 0
+    line_count: int = 0
+    preview: str = ""
 
 
 class ProjectContext(BaseModel):
@@ -19,6 +85,11 @@ class ProjectContext(BaseModel):
 
 class StackraiseModules(BaseModel):
     detected: dict[str, bool] = Field(default_factory=dict)
+    module_tree: list[ModuleTreeNode] = Field(default_factory=list)
+    module_index: list[ModuleIndexEntry] = Field(default_factory=list)
+    symbol_index: list[SymbolIndexEntry] = Field(default_factory=list)
+    dependency_edges: list[DependencyEdgeEntry] = Field(default_factory=list)
+    content_catalog: list[ContentChunkEntry] = Field(default_factory=list)
 
 
 class DomainContext(BaseModel):

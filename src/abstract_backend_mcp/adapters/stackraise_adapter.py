@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib
+import inspect
 from typing import Any
 
 from abstract_backend_mcp.core.logging import get_logger
@@ -128,3 +129,105 @@ class StackraiseAdapter:
     def get_frontend_contracts(self) -> dict[str, Any]:
         """Best-effort detection of frontend contracts — requires static analysis."""
         return {"note": "Frontend contract detection requires static file analysis"}
+
+    def get_runtime_module_metadata(
+        self,
+        modules: dict[str, bool] | None = None,
+    ) -> list[dict[str, Any]]:
+        """Return runtime metadata for importable Stackraise modules."""
+        module_map = modules or self.detect_modules()
+        metadata: list[dict[str, Any]] = []
+
+        for mod_name, available in module_map.items():
+            if not available:
+                continue
+
+            module_obj = self._get_module(mod_name)
+            if module_obj is None:
+                continue
+
+            fq_module = f"{self._package}.{mod_name}"
+            exports = self._list_module_exports(module_obj)
+            metadata.append(
+                {
+                    "module_id": f"mod:{fq_module}",
+                    "module": fq_module,
+                    "package": fq_module.rsplit(".", 1)[0],
+                    "source": "runtime",
+                    "exports": exports,
+                    "exports_count": len(exports),
+                }
+            )
+
+        metadata.sort(key=lambda item: item["module"])
+        return metadata
+
+    def get_runtime_symbol_index(
+        self,
+        modules: dict[str, bool] | None = None,
+    ) -> list[dict[str, Any]]:
+        """Return symbol metadata discovered from imported modules."""
+        module_map = modules or self.detect_modules()
+        symbols: list[dict[str, Any]] = []
+
+        for mod_name, available in module_map.items():
+            if not available:
+                continue
+
+            module_obj = self._get_module(mod_name)
+            if module_obj is None:
+                continue
+
+            fq_module = f"{self._package}.{mod_name}"
+            module_id = f"mod:{fq_module}"
+            for symbol_name in self._list_module_exports(module_obj):
+                if not hasattr(module_obj, symbol_name):
+                    continue
+
+                symbol_obj = getattr(module_obj, symbol_name)
+                symbol_kind = self._resolve_symbol_kind(symbol_obj)
+                symbol_meta: dict[str, Any] = {
+                    "symbol_id": f"sym:runtime:{module_id}:{symbol_name}",
+                    "module_id": module_id,
+                    "module": fq_module,
+                    "name": symbol_name,
+                    "qualname": symbol_name,
+                    "kind": symbol_kind,
+                    "source": "runtime",
+                    "line": 0,
+                    "end_line": 0,
+                    "path": "",
+                }
+
+                if inspect.isclass(symbol_obj):
+                    symbol_meta["mro"] = [cls.__name__ for cls in symbol_obj.mro()]
+                if callable(symbol_obj):
+                    symbol_meta["signature"] = self._safe_signature(symbol_obj)
+
+                symbols.append(symbol_meta)
+
+        symbols.sort(key=lambda item: (item["module"], item["name"]))
+        return symbols
+
+    def _list_module_exports(self, module_obj: Any) -> list[str]:
+        exports = getattr(module_obj, "__all__", None)
+        if isinstance(exports, (list, tuple)):
+            return sorted(str(item) for item in exports)
+        return sorted(name for name in dir(module_obj) if not name.startswith("_"))
+
+    def _resolve_symbol_kind(self, symbol_obj: Any) -> str:
+        if inspect.isclass(symbol_obj):
+            return "class"
+        if inspect.isfunction(symbol_obj):
+            return "function"
+        if inspect.ismethod(symbol_obj):
+            return "method"
+        if callable(symbol_obj):
+            return "callable"
+        return "attribute"
+
+    def _safe_signature(self, symbol_obj: Any) -> str:
+        try:
+            return str(inspect.signature(symbol_obj))
+        except (TypeError, ValueError):
+            return ""

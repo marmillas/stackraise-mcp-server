@@ -356,10 +356,16 @@ After running `abstract-mcp init`, use the generated `opencode.jsonc`:
 }
 ```
 
-Agent roles (see generated `AGENTS.md`):
-- **plan** – read-only analysis, starts with context snapshot
-- **build** – implementation with controlled writes
-- **audit** – review, quality, security assessment
+The generated `opencode.jsonc` also includes an `agent` block with predefined prompts:
+
+- **audit** – review, quality and security assessment
+- **build** – implementation from execution plan
+- **fix** – remediation based on audit findings
+- **doc** – documentation engineering (Markdown-only edits)
+- **plan** – planning and decomposition before implementation
+
+`AGENTS.md` remains a concise operational role reference and is generated alongside
+`opencode.jsonc`.
 
 ## Limitations (v1)
 

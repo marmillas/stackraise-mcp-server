@@ -18,6 +18,24 @@
 - MongoDB writes possible if settings allow
 - Should use context snapshot before modifying code
 
+## fix
+
+**Role**: Remediation after audit findings.
+
+- Prioritize correctness/security fixes
+- Keep blast radius minimal
+- Avoid unrelated refactors
+- Verify regressions with focused tests
+
+## doc
+
+**Role**: Documentation engineering.
+
+- Markdown-only edits (`*.md`, `*.mdx` when applicable)
+- Keep docs aligned with verified code behavior
+- Explicitly document constraints, assumptions, and gaps
+- Do not modify source/config/test files
+
 ## audit
 
 **Role**: Review, quality and security assessment.

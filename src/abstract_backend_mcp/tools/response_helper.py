@@ -5,6 +5,14 @@ from __future__ import annotations
 from typing import Any
 
 
+def build_success_payload(data: Any | None = None, **meta: Any) -> dict[str, Any]:
+    payload: dict[str, Any] = {"ok": True}
+    if data is not None:
+        payload["data"] = data
+    payload.update(meta)
+    return payload
+
+
 def build_error_payload(
     *,
     code: str,

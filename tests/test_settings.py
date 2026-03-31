@@ -13,6 +13,8 @@ def test_defaults():
     assert s.redact_sensitive_fields is True
     assert s.allow_fastapi_runtime_imports is False
     assert s.mongodb_sample_max_documents == 20
+    assert s.mongodb_sample_max_bytes == 65536
+    assert s.mongodb_sample_max_field_chars == 2000
     assert s.stackraise_context_mode == ContextMode.HYBRID
     assert s.allow_runtime_context_imports is False
     assert s.enable_deep_stackraise_context is True

@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from abstract_backend_mcp.adapters.fastapi_adapter import FastAPIAdapter
-from abstract_backend_mcp.tools.response_helper import build_error_payload
+from abstract_backend_mcp.tools.response_helper import build_error_payload, build_success_payload
 
 if TYPE_CHECKING:
     from mcp.server.fastmcp import FastMCP
@@ -51,7 +51,7 @@ def register(server: FastMCP, settings: MCPSettings) -> None:
 
         try:
             routes = adapter.list_routes()
-            return {"items": routes, "total": len(routes)}
+            return build_success_payload(items=routes, total=len(routes))
         except Exception as exc:
             return error_payload(
                 code="FASTAPI_LIST_ROUTES_FAILED",
@@ -70,7 +70,11 @@ def register(server: FastMCP, settings: MCPSettings) -> None:
 
         try:
             routes = adapter.find_routes(path_fragment)
-            return {"items": routes, "total": len(routes), "path_fragment": path_fragment}
+            return build_success_payload(
+                items=routes,
+                total=len(routes),
+                path_fragment=path_fragment,
+            )
         except Exception as exc:
             return error_payload(
                 code="FASTAPI_FIND_ROUTE_FAILED",
@@ -89,7 +93,7 @@ def register(server: FastMCP, settings: MCPSettings) -> None:
 
         try:
             summary = adapter.get_openapi_summary()
-            return {"ok": True, "summary": summary}
+            return build_success_payload(summary=summary)
         except Exception as exc:
             return error_payload(
                 code="FASTAPI_OPENAPI_SUMMARY_FAILED",

@@ -67,3 +67,46 @@ def test_snapshot_schema_stability(tmp_path):
         "content_catalog",
     }
     assert set(sr["modules"].keys()) == module_keys
+
+
+def test_snapshot_runtime_respects_fastapi_runtime_policy(tmp_path):
+    settings = MCPSettings(
+        _env_file=None,
+        project_root=str(tmp_path),
+        allow_runtime_context_imports=True,
+        allow_fastapi_runtime_imports=False,
+        fastapi_app_path="nonexistent.module:app",
+    )
+    adapter = StackraiseAdapter("nonexistent_package")
+    snapshot = build_snapshot(settings, adapter, mode="runtime")
+
+    warnings = snapshot["extraction"]["warnings"]
+    assert any("ALLOW_FASTAPI_RUNTIME_IMPORTS=false" in msg for msg in warnings)
+    assert not any("Could not import FastAPI app" in msg for msg in warnings)
+
+
+def test_snapshot_hybrid_uses_static_api_fallback_when_fastapi_runtime_blocked(tmp_path):
+    api_dir = tmp_path / "api"
+    api_dir.mkdir(parents=True)
+    (api_dir / "routes.py").write_text(
+        "from fastapi import APIRouter\n"
+        "router = APIRouter()\n"
+    )
+
+    settings = MCPSettings(
+        _env_file=None,
+        project_root=str(tmp_path),
+        allow_runtime_context_imports=True,
+        allow_fastapi_runtime_imports=False,
+        fastapi_app_path="nonexistent.module:app",
+    )
+    adapter = StackraiseAdapter("nonexistent_package")
+    snapshot = build_snapshot(settings, adapter, mode="hybrid")
+
+    routes = snapshot["stackraise"]["api"]["routes"]
+    assert len(routes) >= 1
+    assert routes[0]["type"] == "router"
+    assert any(
+        "Using static API detection as fallback" in msg
+        for msg in snapshot["extraction"]["warnings"]
+    )

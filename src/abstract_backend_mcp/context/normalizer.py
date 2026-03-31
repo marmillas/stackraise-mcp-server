@@ -105,7 +105,10 @@ def build_snapshot(
             fallback_used = True
             warnings.append(f"Runtime extraction failed: {exc}")
 
-    if mode == "static" or (mode == "hybrid" and fallback_used and not api.routes):
+    fastapi_runtime_blocked = mode == "hybrid" and not settings.allow_fastapi_runtime_imports
+    if mode == "static" or (
+        mode == "hybrid" and (fallback_used or fastapi_runtime_blocked) and not api.routes
+    ):
         # Fill API from static routers detection
         api.routes = [
             {"file": r["file"], "type": r["type"], "name": r.get("name", "")}

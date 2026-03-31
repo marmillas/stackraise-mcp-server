@@ -7,5 +7,47 @@
       "command": ["poetry", "run", "abstract-mcp", "serve"],
       "enabled": true
     }
+  },
+  "agent": {
+    "audit": {
+      "description": "Review, quality and security assessment",
+      "prompt": {{ audit_prompt | tojson }},
+      "tools": {
+        "write": false,
+        "edit": false
+      }
+    },
+    "build": {
+      "description": "Implementation agent from execution plan",
+      "prompt": {{ builder_prompt | tojson }},
+      "tools": {
+        "write": true,
+        "edit": true
+      }
+    },
+    "fix": {
+      "description": "Automated code repair agent",
+      "prompt": {{ fix_prompt | tojson }},
+      "tools": {
+        "write": true,
+        "edit": true
+      }
+    },
+    "doc": {
+      "description": "Documentation engineering agent",
+      "prompt": {{ doc_prompt | tojson }},
+      "tools": {
+        "write": true,
+        "edit": true
+      }
+    },
+    "plan": {
+      "description": "Planning and problem-solving agent",
+      "prompt": {{ plan_prompt | tojson }},
+      "tools": {
+        "write": false,
+        "edit": false
+      }
+    }
   }
 }

@@ -63,17 +63,25 @@ def extract_runtime_context(
         context["domain_model"] = {"available": False}
         warnings.append(f"Domain model extraction failed: {exc}")
 
-    # FastAPI routes (via adapter if available)
-    try:
-        from abstract_backend_mcp.adapters.fastapi_adapter import FastAPIAdapter
+    # FastAPI routes (via adapter if allowed by policy)
+    if settings.allow_fastapi_runtime_imports:
+        try:
+            from abstract_backend_mcp.adapters.fastapi_adapter import FastAPIAdapter
 
-        fa = FastAPIAdapter(settings.fastapi_app_path)
-        context["routes"] = fa.list_routes()
-        context["openapi_summary"] = fa.get_openapi_summary()
-    except Exception as exc:
+            fa = FastAPIAdapter(settings.fastapi_app_path)
+            context["routes"] = fa.list_routes()
+            context["openapi_summary"] = fa.get_openapi_summary()
+        except Exception as exc:
+            context["routes"] = []
+            context["openapi_summary"] = {}
+            warnings.append(f"FastAPI route extraction failed: {exc}")
+    else:
         context["routes"] = []
         context["openapi_summary"] = {}
-        warnings.append(f"FastAPI route extraction failed: {exc}")
+        warnings.append(
+            "FastAPI runtime imports disabled by policy "
+            "(ALLOW_FASTAPI_RUNTIME_IMPORTS=false)"
+        )
 
     context["_warnings"] = warnings
     return context

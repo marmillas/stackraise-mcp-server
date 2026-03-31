@@ -14,6 +14,8 @@ enable_quality_tools: true
 mongodb_uri: "mongodb://localhost:27017"
 mongodb_db_name: "{{ project_name }}"
 mongodb_sample_max_documents: 20
+mongodb_sample_max_bytes: 65536
+mongodb_sample_max_field_chars: 2000
 
 stackraise_context_mode: hybrid
 allow_runtime_context_imports: false

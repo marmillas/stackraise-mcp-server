@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any
 from abstract_backend_mcp.adapters.mongodb_adapter import MongoDBAdapter
 from abstract_backend_mcp.context.redaction import sanitize_output_payload
 from abstract_backend_mcp.core.errors import UnsafeOperationError
-from abstract_backend_mcp.tools.response_helper import build_error_payload
+from abstract_backend_mcp.tools.response_helper import build_error_payload, build_success_payload
 
 if TYPE_CHECKING:
     from mcp.server.fastmcp import FastMCP
@@ -30,6 +30,12 @@ def register(server: FastMCP, settings: MCPSettings) -> None:
         if limit <= 0:
             return min(5, max_limit)
         return min(limit, max_limit)
+
+    def normalize_sample_max_bytes() -> int:
+        return max(1024, settings.mongodb_sample_max_bytes)
+
+    def normalize_sample_max_field_chars() -> int:
+        return max(64, settings.mongodb_sample_max_field_chars)
 
     def error_payload(
         *,
@@ -56,7 +62,10 @@ def register(server: FastMCP, settings: MCPSettings) -> None:
     def list_collections() -> dict[str, Any]:
         try:
             collections = adapter.list_collections()
-            return {"collections": collections, "total": len(collections)}
+            return build_success_payload(
+                collections=collections,
+                total=len(collections),
+            )
         except Exception as exc:
             return error_payload(
                 code="MONGODB_LIST_COLLECTIONS_FAILED",
@@ -72,13 +81,20 @@ def register(server: FastMCP, settings: MCPSettings) -> None:
         try:
             safe_limit = normalize_sample_limit(limit)
             docs = adapter.sample_documents(collection, safe_limit)
-            return sanitize(
-                {
-                    "collection": collection,
-                    "limit": safe_limit,
-                    "count": len(docs),
-                    "documents": docs,
-                }
+            docs = sanitize(docs)
+            bounded_docs, truncated = _bound_documents_payload(
+                docs,
+                max_total_bytes=normalize_sample_max_bytes(),
+                max_field_chars=normalize_sample_max_field_chars(),
+            )
+            return build_success_payload(
+                collection=collection,
+                limit=safe_limit,
+                count=len(bounded_docs),
+                documents=bounded_docs,
+                max_total_bytes=normalize_sample_max_bytes(),
+                max_field_chars=normalize_sample_max_field_chars(),
+                truncated=truncated,
             )
         except Exception as exc:
             return error_payload(
@@ -95,7 +111,12 @@ def register(server: FastMCP, settings: MCPSettings) -> None:
         try:
             filter_ = json.loads(filter_json)
             count = adapter.count_documents(collection, filter_)
-            return sanitize({"collection": collection, "count": count})
+            return sanitize(
+                build_success_payload(
+                    collection=collection,
+                    count=count,
+                )
+            )
         except json.JSONDecodeError as exc:
             return error_payload(
                 code="MONGODB_INVALID_FILTER_JSON",
@@ -115,7 +136,13 @@ def register(server: FastMCP, settings: MCPSettings) -> None:
     )
     def show_indexes(collection: str) -> dict[str, Any]:
         try:
-            return sanitize({"collection": collection, "indexes": adapter.show_indexes(collection)})
+            indexes = adapter.show_indexes(collection)
+            return sanitize(
+                build_success_payload(
+                    collection=collection,
+                    indexes=indexes,
+                )
+            )
         except Exception as exc:
             return error_payload(
                 code="MONGODB_SHOW_INDEXES_FAILED",
@@ -134,7 +161,7 @@ def register(server: FastMCP, settings: MCPSettings) -> None:
     ) -> dict[str, Any]:
         try:
             document = json.loads(document_json)
-            return adapter.insert_one(collection, document, confirmed)
+            return build_success_payload(**adapter.insert_one(collection, document, confirmed))
         except UnsafeOperationError as exc:
             return error_payload(
                 code="MONGODB_WRITE_BLOCKED",
@@ -168,7 +195,8 @@ def register(server: FastMCP, settings: MCPSettings) -> None:
         try:
             filter_ = json.loads(filter_json)
             update = json.loads(update_json)
-            return adapter.update_one(collection, filter_, update, confirmed)
+            result = adapter.update_one(collection, filter_, update, confirmed)
+            return build_success_payload(**result)
         except UnsafeOperationError as exc:
             return error_payload(
                 code="MONGODB_WRITE_BLOCKED",
@@ -198,7 +226,7 @@ def register(server: FastMCP, settings: MCPSettings) -> None:
     ) -> dict[str, Any]:
         try:
             filter_ = json.loads(filter_json)
-            return adapter.delete_one(collection, filter_, confirmed)
+            return build_success_payload(**adapter.delete_one(collection, filter_, confirmed))
         except UnsafeOperationError as exc:
             return error_payload(
                 code="MONGODB_WRITE_BLOCKED",
@@ -218,3 +246,51 @@ def register(server: FastMCP, settings: MCPSettings) -> None:
                 message=str(exc),
                 retriable=True,
             )
+
+
+def _bound_documents_payload(
+    docs: list[dict[str, Any]],
+    *,
+    max_total_bytes: int,
+    max_field_chars: int,
+) -> tuple[list[dict[str, Any]], bool]:
+    bounded: list[dict[str, Any]] = []
+    used = 0
+    truncated = False
+
+    for doc in docs:
+        normalized = _truncate_large_strings(doc, max_field_chars=max_field_chars)
+        encoded = _estimate_json_bytes(normalized)
+        if used + encoded > max_total_bytes:
+            truncated = True
+            break
+        bounded.append(normalized)
+        used += encoded
+
+    return bounded, truncated
+
+
+def _truncate_large_strings(value: Any, *, max_field_chars: int) -> Any:
+    if isinstance(value, str):
+        if len(value) <= max_field_chars:
+            return value
+        return value[:max_field_chars] + "…<truncated>"
+
+    if isinstance(value, list):
+        return [_truncate_large_strings(item, max_field_chars=max_field_chars) for item in value]
+
+    if isinstance(value, dict):
+        return {
+            key: _truncate_large_strings(item, max_field_chars=max_field_chars)
+            for key, item in value.items()
+        }
+
+    return value
+
+
+def _estimate_json_bytes(value: Any) -> int:
+    try:
+        raw = json.dumps(value, ensure_ascii=False)
+    except TypeError:
+        raw = json.dumps(str(value), ensure_ascii=False)
+    return len(raw.encode("utf-8"))

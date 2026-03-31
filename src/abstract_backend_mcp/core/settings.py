@@ -40,6 +40,8 @@ class MCPSettings(BaseSettings):
     mongodb_db_name: str = "mydb"
     enable_mongodb_tools: bool = True
     mongodb_sample_max_documents: int = 20
+    mongodb_sample_max_bytes: int = 65536
+    mongodb_sample_max_field_chars: int = 2000
 
     # Stackraise
     stackraise_package_name: str = "stackraise"

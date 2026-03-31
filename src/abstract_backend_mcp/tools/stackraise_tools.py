@@ -8,9 +8,33 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from abstract_backend_mcp.adapters.stackraise_adapter import StackraiseAdapter
+from abstract_backend_mcp.context.module_tree_utils import (
+    find_tree_node as _find_tree_node,
+)
+from abstract_backend_mcp.context.module_tree_utils import (
+    prune_tree_node as _prune_tree_node,
+)
 from abstract_backend_mcp.context.provider import StackraiseContextProvider
 from abstract_backend_mcp.context.redaction import sanitize_output_payload
 from abstract_backend_mcp.tools.response_helper import build_error_payload
+from abstract_backend_mcp.tools.stackraise_helpers import (
+    build_chunk_for_range as _build_chunk_for_range,
+)
+from abstract_backend_mcp.tools.stackraise_helpers import (
+    normalize_limit as _normalize_limit,
+)
+from abstract_backend_mcp.tools.stackraise_helpers import (
+    parse_chunk_id_range as _parse_chunk_id_range,
+)
+from abstract_backend_mcp.tools.stackraise_helpers import (
+    resolve_module_entry as _resolve_module_entry,
+)
+from abstract_backend_mcp.tools.stackraise_helpers import (
+    slice_page as _slice_page,
+)
+from abstract_backend_mcp.tools.stackraise_helpers import (
+    unsafe_regex_reason as _unsafe_regex_reason,
+)
 
 if TYPE_CHECKING:
     from mcp.server.fastmcp import FastMCP
@@ -580,121 +604,3 @@ def register(server: FastMCP, settings: MCPSettings) -> None:
             }
         )
 
-
-def _normalize_limit(limit: int, *, default: int = 50, max_limit: int = 200) -> int:
-    if limit <= 0:
-        return default
-    return min(limit, max_limit)
-
-
-def _slice_page(
-    items: list[dict[str, Any]],
-    *,
-    offset: int,
-    limit: int,
-    max_limit: int,
-) -> list[dict[str, Any]]:
-    safe_offset = max(offset, 0)
-    safe_limit = _normalize_limit(limit, max_limit=max_limit)
-    return items[safe_offset : safe_offset + safe_limit]
-
-
-def _resolve_module_entry(
-    module_id: str,
-    module: str,
-    inventory: dict[str, Any],
-) -> dict[str, Any] | None:
-    if module_id:
-        return next(
-            (
-                entry
-                for entry in inventory.get("module_index", [])
-                if entry.get("module_id") == module_id
-            ),
-            None,
-        )
-    if module:
-        return next(
-            (entry for entry in inventory.get("module_index", []) if entry.get("module") == module),
-            None,
-        )
-    return None
-
-
-def _build_chunk_for_range(
-    *,
-    lines: list[str],
-    module_id: str,
-    module: str,
-    path: str,
-    start_line: int,
-    end_line: int,
-) -> dict[str, Any]:
-    chunk_lines = lines[start_line - 1 : end_line]
-    return {
-        "chunk_id": f"chunk:{module_id}:{start_line}-{end_line}",
-        "module_id": module_id,
-        "module": module,
-        "path": path,
-        "source": "static",
-        "start_line": start_line,
-        "end_line": end_line,
-        "line_count": len(chunk_lines),
-        "preview": "\n".join(chunk_lines[:3]),
-        "content": "\n".join(chunk_lines),
-    }
-
-
-def _parse_chunk_id_range(chunk_id: str, *, module_id: str) -> tuple[int, int] | None:
-    prefix = f"chunk:{module_id}:"
-    if not chunk_id.startswith(prefix):
-        return None
-
-    range_token = chunk_id[len(prefix) :]
-    if "-" not in range_token:
-        return None
-
-    start_token, end_token = range_token.split("-", 1)
-    try:
-        start_line = int(start_token)
-        end_line = int(end_token)
-    except ValueError:
-        return None
-
-    if start_line < 1 or end_line < start_line:
-        return None
-
-    return start_line, end_line
-
-
-def _find_tree_node(nodes: list[dict[str, Any]], module_name: str) -> dict[str, Any] | None:
-    for node in nodes:
-        if node.get("module") == module_name:
-            return node
-        child = _find_tree_node(list(node.get("children", [])), module_name)
-        if child is not None:
-            return child
-    return None
-
-
-def _prune_tree_node(node: dict[str, Any], depth: int) -> dict[str, Any]:
-    clone = dict(node)
-    children = list(node.get("children", []))
-    if depth <= 0:
-        clone["children"] = []
-        return clone
-
-    clone["children"] = [_prune_tree_node(child, depth - 1) for child in children]
-    return clone
-
-
-def _unsafe_regex_reason(pattern: str) -> str | None:
-    if "(?<=" in pattern or "(?<!" in pattern:
-        return "lookbehind assertions are not allowed"
-    if "(?P<" in pattern:
-        return "named groups are not allowed"
-    if re.search(r"\\[1-9]", pattern):
-        return "backreferences are not allowed"
-    if re.search(r"\([^\n)]*[+*][^\n)]*\)[+*]", pattern):
-        return "nested quantifiers are not allowed"
-    return None

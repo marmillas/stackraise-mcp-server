@@ -8,6 +8,7 @@ import hashlib
 from pathlib import Path
 from typing import Any
 
+from abstract_backend_mcp.context.module_tree_utils import build_module_tree
 from abstract_backend_mcp.core.logging import get_logger
 
 logger = get_logger()
@@ -191,7 +192,7 @@ def build_stackraise_module_inventory(
     dependency_edges.sort(key=lambda item: (item["source_module"], item["line"], item["target"]))
 
     return {
-        "module_tree": _build_module_tree(module_index),
+        "module_tree": build_module_tree(module_index),
         "module_index": module_index,
         "symbol_index": symbol_index,
         "dependency_edges": dependency_edges,
@@ -201,7 +202,7 @@ def build_stackraise_module_inventory(
 
 def build_module_tree_from_index(module_index: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Build module tree from an existing module index."""
-    return _build_module_tree(module_index)
+    return build_module_tree(module_index)
 
 
 # --- helpers ---
@@ -280,61 +281,6 @@ def _module_name_from_path(filepath: Path, package_root: Path) -> str:
     if parts and parts[-1] == "__init__":
         parts = parts[:-1]
     return ".".join(parts)
-
-
-def _build_module_tree(module_index: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    nodes: dict[str, dict[str, Any]] = {}
-    roots: dict[str, dict[str, Any]] = {}
-
-    def ensure_node(dotted_name: str) -> dict[str, Any]:
-        if dotted_name not in nodes:
-            node_name = dotted_name.split(".")[-1]
-            nodes[dotted_name] = {
-                "name": node_name,
-                "module": dotted_name,
-                "module_id": f"mod:{dotted_name}",
-                "kind": "namespace",
-                "path": "",
-                "children": [],
-            }
-        return nodes[dotted_name]
-
-    for module in module_index:
-        dotted = module["module"]
-        parts = dotted.split(".")
-        for idx in range(len(parts)):
-            current = ".".join(parts[: idx + 1])
-            current_node = ensure_node(current)
-            if idx == len(parts) - 1:
-                current_node.update(
-                    {
-                        "module_id": module["module_id"],
-                        "kind": module["kind"],
-                        "path": module["path"],
-                        "line_count": module["line_count"],
-                        "hash": module["hash"],
-                    }
-                )
-
-            if idx == 0:
-                roots.setdefault(current, current_node)
-                continue
-
-            parent = ".".join(parts[:idx])
-            parent_node = ensure_node(parent)
-            if not any(child["module"] == current for child in parent_node["children"]):
-                parent_node["children"].append(current_node)
-
-    for root in roots.values():
-        _sort_tree_node(root)
-
-    return sorted(roots.values(), key=lambda node: node["module"])
-
-
-def _sort_tree_node(node: dict[str, Any]) -> None:
-    node["children"].sort(key=lambda child: child["name"])
-    for child in node["children"]:
-        _sort_tree_node(child)
 
 
 def _extract_symbols(

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from abstract_backend_mcp.adapters.fastapi_adapter import FastAPIAdapter
 from abstract_backend_mcp.adapters.mongodb_adapter import MongoDBAdapter
 from abstract_backend_mcp.core.server import create_server
 from abstract_backend_mcp.core.settings import MCPSettings
@@ -53,6 +54,32 @@ def test_fastapi_error_envelope_for_invalid_app_import_when_allowed(tmp_path):
     assert payload["ok"] is False
     assert payload["error_detail"]["code"] == "FASTAPI_LIST_ROUTES_FAILED"
     assert payload["error_detail"]["retriable"] is True
+
+
+def test_fastapi_success_payload_shape_without_data_duplication(tmp_path, monkeypatch):
+    def fake_list_routes(self):
+        return [{"path": "/ping", "methods": ["GET"], "name": "ping", "tags": []}]
+
+    monkeypatch.setattr(FastAPIAdapter, "list_routes", fake_list_routes)
+
+    settings = MCPSettings(
+        _env_file=None,
+        project_root=str(tmp_path),
+        enable_test_tools=False,
+        enable_quality_tools=False,
+        enable_fastapi_tools=True,
+        enable_mongodb_tools=False,
+        enable_stackraise_tools=False,
+        allow_fastapi_runtime_imports=True,
+        fastapi_app_path="invalid.module:app",
+    )
+    server = create_server(settings)
+
+    payload = _tool_fn(server, "list_routes")()
+
+    assert payload["ok"] is True
+    assert payload["total"] == 1
+    assert "data" not in payload
 
 
 def test_mongodb_error_envelope_for_invalid_json(tmp_path):
@@ -133,3 +160,32 @@ def test_mongodb_sample_documents_limit_and_redaction(tmp_path, monkeypatch):
     assert captured_limit == 2
     assert payload["documents"][0]["password"] == "***REDACTED***"
     assert "token12345678" not in payload["documents"][0]["note"]
+
+
+def test_mongodb_write_success_payload_is_backward_compatible(tmp_path, monkeypatch):
+    def fake_insert_one(self, collection: str, document: dict[str, str], confirmed: bool = False):
+        return {"inserted_id": "abc123"}
+
+    monkeypatch.setattr(MongoDBAdapter, "insert_one", fake_insert_one)
+
+    settings = MCPSettings(
+        _env_file=None,
+        project_root=str(tmp_path),
+        enable_test_tools=False,
+        enable_quality_tools=False,
+        enable_fastapi_tools=False,
+        enable_mongodb_tools=True,
+        enable_stackraise_tools=False,
+        allow_write_operations=True,
+    )
+    server = create_server(settings)
+
+    payload = _tool_fn(server, "insert_one_controlled")(
+        collection="users",
+        document_json='{"name":"Ada"}',
+        confirmed=True,
+    )
+
+    assert payload["ok"] is True
+    assert payload["inserted_id"] == "abc123"
+    assert "data" not in payload

@@ -161,6 +161,8 @@ Settings are loaded from (in order of priority):
 | `FASTAPI_APP_PATH` | `app.main:app` | Python import path of the FastAPI app |
 | `MONGODB_URI` | `mongodb://localhost:27017` | MongoDB connection string |
 | `MONGODB_SAMPLE_MAX_DOCUMENTS` | `20` | Maximum number of sampled documents returned by MongoDB tools |
+| `MONGODB_SAMPLE_MAX_BYTES` | `65536` | Maximum total bytes returned by `sample_documents` |
+| `MONGODB_SAMPLE_MAX_FIELD_CHARS` | `2000` | Max characters preserved per string field in sampled documents |
 | `ENABLE_FASTAPI_TOOLS` | `true` | Enable FastAPI tools |
 | `ALLOW_FASTAPI_RUNTIME_IMPORTS` | `false` | Allow importing FastAPI runtime app for route/OpenAPI inspection |
 | `ENABLE_MONGODB_TOOLS` | `true` | Enable MongoDB tools |
@@ -183,6 +185,18 @@ Settings are loaded from (in order of priority):
 | `STACKRAISE_CONTEXT_FINGERPRINT_TTL_SECONDS` | `1` | TTL for project fingerprint reuse before rescanning files |
 | `REDACT_SENSITIVE_FIELDS` | `true` | Redact secrets in all output |
 | `PROJECT_INSTRUCTIONS_FILE` | `PROJECT.md` | Path to project instructions file |
+
+### Cache profile recommendations
+
+- **High precision profile** (always reflect file changes quickly):
+  - `STACKRAISE_CONTEXT_FINGERPRINT_TTL_SECONDS=0`
+  - `STACKRAISE_CONTEXT_CACHE_TTL_SECONDS=0`
+- **Balanced profile** (default, better performance):
+  - `STACKRAISE_CONTEXT_FINGERPRINT_TTL_SECONDS=1`
+  - `STACKRAISE_CONTEXT_CACHE_TTL_SECONDS=30`
+
+Use the high precision profile when actively editing many modules and you need the most
+up-to-date snapshot on every request.
 
 ## Project Instructions (PROJECT.md)
 
@@ -269,6 +283,8 @@ When `ALLOW_FASTAPI_RUNTIME_IMPORTS=false`, FastAPI introspection tools return a
 
 MongoDB sample responses are bounded by `MONGODB_SAMPLE_MAX_DOCUMENTS` and respect
 `REDACT_SENSITIVE_FIELDS` for textual/key-based redaction.
+Additionally, payload size is bounded by `MONGODB_SAMPLE_MAX_BYTES` and large string
+fields are truncated according to `MONGODB_SAMPLE_MAX_FIELD_CHARS`.
 
 ### Stackraise
 - `detect_stackraise`, `show_stackraise_modules`

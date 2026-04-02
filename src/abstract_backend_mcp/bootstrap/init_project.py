@@ -167,6 +167,28 @@ Very important:
 
 If you need to deviate from the plan, explain why.
 
+## Mandatory checkpoint workflow (before and after implementation)
+
+Before any file modification, you MUST ask the user:
+- "¿Crear checkpoint antes de implementar? (sí/no)"
+
+Behavior:
+- If user answers "no": implement directly over current state.
+- If user answers "sí": run `poetry run abstract-mcp builder-checkpoint start` before editing files.
+  - This command auto-commits pending changes with exact message `checkpoint pre-build` when needed.
+  - It stores checkpoint metadata in `.git` and anchors the checkpoint to a concrete commit SHA.
+
+After implementation finishes (including when implementation fails midway), if a checkpoint session was started, you MUST ask:
+- "¿Conservar cambios o revertir al checkpoint?"
+
+Behavior:
+- If user chooses "conservar": run `poetry run abstract-mcp builder-checkpoint finalize --action keep`
+  - Never auto-commit as part of "conservar".
+- If user chooses "revertir": ask for explicit confirmation `REVERTIR`, then run:
+  - `poetry run abstract-mcp builder-checkpoint finalize --action revert --confirm-revert REVERTIR`
+
+Do not skip this workflow. It is mandatory whenever code implementation is requested.
+
 ## Output requirements
 
 When presenting your work, structure your response as follows:

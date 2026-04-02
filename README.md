@@ -367,6 +367,23 @@ The generated `opencode.jsonc` also includes an `agent` block with predefined pr
 `AGENTS.md` remains a concise operational role reference and is generated alongside
 `opencode.jsonc`.
 
+### Builder checkpoint workflow
+
+The CLI includes a checkpoint helper for builder sessions:
+
+- `poetry run abstract-mcp builder-checkpoint start`
+- `poetry run abstract-mcp builder-checkpoint finalize --action keep`
+- `poetry run abstract-mcp builder-checkpoint finalize --action revert --confirm-revert REVERTIR`
+
+Behavior:
+
+- On `start`, if the Git tree is dirty, the command runs `git add -A` and creates
+  a local commit with exact message `checkpoint pre-build`.
+- It stores checkpoint metadata in `.git/abstract_builder_checkpoint_session.json`
+  using the resulting `HEAD` SHA as restore target.
+- On `finalize --action revert`, it performs `git reset --hard <base_head_sha>` and
+  `git clean -fd` after confirmation.
+
 ## Limitations (v1)
 
 - No HTTP/SSE transport (stdio only)

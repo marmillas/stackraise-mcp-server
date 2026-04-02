@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import click
 
 from abstract_backend_mcp.core.logging import get_logger
@@ -40,6 +42,64 @@ def init(dry_run: bool, target: str) -> None:
     from abstract_backend_mcp.bootstrap.init_project import run_init
 
     run_init(target_dir=target, dry_run=dry_run)
+
+
+@cli.group("builder-checkpoint")
+def builder_checkpoint() -> None:
+    """Manage builder checkpoint sessions."""
+
+
+@builder_checkpoint.command("start")
+@click.option("--repo-root", default=".", help="Git repository root or child path.")
+def builder_checkpoint_start(repo_root: str) -> None:
+    """Create a checkpoint before builder edits."""
+    from abstract_backend_mcp.core.builder_checkpoint import (
+        CHECKPOINT_COMMIT_MESSAGE,
+        CheckpointError,
+        start_checkpoint,
+    )
+
+    try:
+        session = start_checkpoint(Path(repo_root))
+    except CheckpointError as exc:
+        raise click.ClickException(str(exc)) from exc
+
+    click.echo(f"Checkpoint session created: {session.session_id}")
+    click.echo(f"Base branch: {session.base_branch}")
+    click.echo(f"Base SHA: {session.base_head_sha}")
+    if session.auto_commit_performed:
+        click.echo(f"Auto-commit created with message: '{CHECKPOINT_COMMIT_MESSAGE}'")
+
+
+@builder_checkpoint.command("finalize")
+@click.option("--action", type=click.Choice(["keep", "revert"]), required=True)
+@click.option(
+    "--confirm-revert",
+    default="",
+    help="Required literal value for revert action: REVERTIR",
+)
+@click.option("--repo-root", default=".", help="Git repository root or child path.")
+def builder_checkpoint_finalize(action: str, confirm_revert: str, repo_root: str) -> None:
+    """Finalize checkpoint by keeping or reverting changes."""
+    from abstract_backend_mcp.core.builder_checkpoint import (
+        CheckpointError,
+        finalize_checkpoint,
+    )
+
+    try:
+        result = finalize_checkpoint(
+            action=action,
+            confirm_revert=confirm_revert,
+            repo_root=Path(repo_root),
+        )
+    except CheckpointError as exc:
+        raise click.ClickException(str(exc)) from exc
+
+    click.echo(f"Checkpoint finalized with action: {result.action}")
+    if result.reverted_to_sha:
+        click.echo(f"Repository reverted to: {result.reverted_to_sha}")
+    for warning in result.warnings:
+        click.echo(f"Warning: {warning}")
 
 
 if __name__ == "__main__":

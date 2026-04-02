@@ -176,7 +176,11 @@ Behavior:
 - If user answers "no": implement directly over current state.
 - If user answers "sí": run `poetry run abstract-mcp builder-checkpoint start` before editing files.
   - This command auto-commits pending changes with exact message `checkpoint pre-build` when needed.
+  - If sensitive-looking files are detected, start may fail unless explicitly allowed with `--allow-sensitive-autocommit`.
   - It stores checkpoint metadata in `.git` and anchors the checkpoint to a concrete commit SHA.
+
+Before starting a new implementation step, check existing session state with:
+- `poetry run abstract-mcp builder-checkpoint status`
 
 After implementation finishes (including when implementation fails midway), if a checkpoint session was started, you MUST ask:
 - "¿Conservar cambios o revertir al checkpoint?"
@@ -186,6 +190,7 @@ Behavior:
   - Never auto-commit as part of "conservar".
 - If user chooses "revertir": ask for explicit confirmation `REVERTIR`, then run:
   - `poetry run abstract-mcp builder-checkpoint finalize --action revert --confirm-revert REVERTIR`
+  - If branch changed since checkpoint and user explicitly wants to force revert, add `--allow-cross-branch-revert`.
 
 Do not skip this workflow. It is mandatory whenever code implementation is requested.
 

@@ -51,7 +51,24 @@ def builder_checkpoint() -> None:
 
 @builder_checkpoint.command("start")
 @click.option("--repo-root", default=".", help="Git repository root or child path.")
-def builder_checkpoint_start(repo_root: str) -> None:
+@click.option(
+    "--allow-sensitive-autocommit",
+    is_flag=True,
+    default=False,
+    help="Allow auto-commit even when sensitive-looking paths are detected.",
+)
+@click.option(
+    "--git-timeout-seconds",
+    default=30,
+    show_default=True,
+    type=int,
+    help="Timeout in seconds for each git command.",
+)
+def builder_checkpoint_start(
+    repo_root: str,
+    allow_sensitive_autocommit: bool,
+    git_timeout_seconds: int,
+) -> None:
     """Create a checkpoint before builder edits."""
     from abstract_backend_mcp.core.builder_checkpoint import (
         CHECKPOINT_COMMIT_MESSAGE,
@@ -60,7 +77,11 @@ def builder_checkpoint_start(repo_root: str) -> None:
     )
 
     try:
-        session = start_checkpoint(Path(repo_root))
+        session = start_checkpoint(
+            Path(repo_root),
+            allow_sensitive_autocommit=allow_sensitive_autocommit,
+            git_timeout_seconds=git_timeout_seconds,
+        )
     except CheckpointError as exc:
         raise click.ClickException(str(exc)) from exc
 
@@ -79,7 +100,26 @@ def builder_checkpoint_start(repo_root: str) -> None:
     help="Required literal value for revert action: REVERTIR",
 )
 @click.option("--repo-root", default=".", help="Git repository root or child path.")
-def builder_checkpoint_finalize(action: str, confirm_revert: str, repo_root: str) -> None:
+@click.option(
+    "--allow-cross-branch-revert",
+    is_flag=True,
+    default=False,
+    help="Allow revert even if current branch differs from checkpoint branch.",
+)
+@click.option(
+    "--git-timeout-seconds",
+    default=30,
+    show_default=True,
+    type=int,
+    help="Timeout in seconds for each git command.",
+)
+def builder_checkpoint_finalize(
+    action: str,
+    confirm_revert: str,
+    repo_root: str,
+    allow_cross_branch_revert: bool,
+    git_timeout_seconds: int,
+) -> None:
     """Finalize checkpoint by keeping or reverting changes."""
     from abstract_backend_mcp.core.builder_checkpoint import (
         CheckpointError,
@@ -91,6 +131,8 @@ def builder_checkpoint_finalize(action: str, confirm_revert: str, repo_root: str
             action=action,
             confirm_revert=confirm_revert,
             repo_root=Path(repo_root),
+            allow_cross_branch_revert=allow_cross_branch_revert,
+            git_timeout_seconds=git_timeout_seconds,
         )
     except CheckpointError as exc:
         raise click.ClickException(str(exc)) from exc
@@ -100,6 +142,37 @@ def builder_checkpoint_finalize(action: str, confirm_revert: str, repo_root: str
         click.echo(f"Repository reverted to: {result.reverted_to_sha}")
     for warning in result.warnings:
         click.echo(f"Warning: {warning}")
+
+
+@builder_checkpoint.command("status")
+@click.option("--repo-root", default=".", help="Git repository root or child path.")
+def builder_checkpoint_status(repo_root: str) -> None:
+    """Show active checkpoint status and lock details."""
+    from abstract_backend_mcp.core.builder_checkpoint import (
+        CheckpointError,
+        get_checkpoint_status,
+    )
+
+    try:
+        status = get_checkpoint_status(Path(repo_root))
+    except CheckpointError as exc:
+        raise click.ClickException(str(exc)) from exc
+
+    click.echo(f"Active session: {'yes' if status.active_session else 'no'}")
+    click.echo(f"Session path: {status.session_path}")
+    click.echo(f"Lock present: {'yes' if status.lock_present else 'no'}")
+    if status.lock_present:
+        click.echo(f"Lock stale: {'yes' if status.lock_stale else 'no'}")
+
+    if status.session is not None:
+        click.echo(f"Session ID: {status.session.session_id}")
+        click.echo(f"Base branch: {status.session.base_branch}")
+        click.echo(f"Base SHA: {status.session.base_head_sha}")
+        auto_commit_label = "yes" if status.session.auto_commit_performed else "no"
+        click.echo(f"Auto-commit performed: {auto_commit_label}")
+
+    for issue in status.issues:
+        click.echo(f"Issue: {issue}")
 
 
 if __name__ == "__main__":

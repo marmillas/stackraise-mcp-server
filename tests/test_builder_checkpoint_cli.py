@@ -221,10 +221,30 @@ def test_cli_sync_opencode_policy_updates_and_is_idempotent(tmp_path: Path) -> N
         json.dumps(
             {
                 "agent": {
+                    "audit": {
+                        "description": "audit",
+                        "prompt": "base audit prompt",
+                        "tools": {"write": False, "edit": False},
+                    },
                     "build": {
                         "description": "build",
                         "prompt": "base build prompt",
                         "tools": {"write": True, "edit": True},
+                    },
+                    "fix": {
+                        "description": "fix",
+                        "prompt": "base fix prompt",
+                        "tools": {"write": True, "edit": True},
+                    },
+                    "doc": {
+                        "description": "doc",
+                        "prompt": "base doc prompt",
+                        "tools": {"write": True, "edit": True},
+                    },
+                    "plan": {
+                        "description": "plan",
+                        "prompt": "base plan prompt",
+                        "tools": {"write": False, "edit": False},
                     }
                 }
             },
@@ -240,6 +260,11 @@ def test_cli_sync_opencode_policy_updates_and_is_idempotent(tmp_path: Path) -> N
     )
     assert first.exit_code == 0
     assert "Updated: yes" in first.output
+    assert "Updated roles: audit, build, fix, doc, plan" in first.output
+    synced_text = opencode_path.read_text(encoding="utf-8")
+    assert "## Multi-agent collaboration contract" in synced_text
+    assert "### Role boundary addendum (audit)" in synced_text
+    assert "### Role boundary addendum (build)" in synced_text
 
     second = runner.invoke(
         cli,
@@ -262,3 +287,5 @@ def test_cli_sync_opencode_policy_creates_missing_file(tmp_path: Path) -> None:
     assert result.exit_code == 0
     assert "Created: yes" in result.output
     assert opencode_path.exists()
+    created_text = opencode_path.read_text(encoding="utf-8")
+    assert "## Multi-agent collaboration contract" in created_text

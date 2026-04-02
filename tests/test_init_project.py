@@ -52,3 +52,9 @@ def test_run_init_generates_updated_stackraise_configs(tmp_path):
     assert "senior software planning and problem-solving engineer" in opencode
     assert "builder-checkpoint run" in opencode
     assert "REVERTIR" in opencode
+    assert "## Multi-agent collaboration contract" in opencode
+    assert "### Role boundary addendum (build)" in opencode
+    assert "### Role boundary addendum (audit)" in opencode
+    assert "### Role boundary addendum (fix)" in opencode
+    assert "### Role boundary addendum (doc)" in opencode
+    assert "### Role boundary addendum (plan)" in opencode

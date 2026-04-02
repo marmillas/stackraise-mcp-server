@@ -393,7 +393,8 @@ Behavior:
 - Revert is blocked by default if current branch differs from checkpoint branch.
   Override only explicitly with `--allow-cross-branch-revert`.
 - `sync-opencode-policy` updates (or creates) local `opencode.jsonc` from versioned
-  policy source so ignored runtime configs remain reproducible.
+  policy sources, including multi-agent collaboration addendums for
+  `audit/build/fix/doc/plan`, so ignored runtime configs remain reproducible.
 
 Recommended operational step after pull/init:
 

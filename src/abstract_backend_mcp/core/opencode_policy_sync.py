@@ -1,4 +1,4 @@
-"""Synchronization helpers for local opencode build policy."""
+"""Synchronization helpers for local opencode agent prompts."""
 
 from __future__ import annotations
 
@@ -8,12 +8,16 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from abstract_backend_mcp.bootstrap.init_project import render_opencode_content
-from abstract_backend_mcp.core.build_policy import ensure_builder_checkpoint_policy
+from abstract_backend_mcp.core.agent_prompt_layers import apply_agent_prompt_layers
 
-_BUILD_PROMPT_RE = re.compile(
-    r'("build"\s*:\s*\{.*?"prompt"\s*:\s*)("(?:\\.|[^"\\])*")(\s*,\s*"tools")',
-    re.S,
-)
+AGENT_ROLES: tuple[str, ...] = ("audit", "build", "fix", "doc", "plan")
+
+
+def _prompt_regex_for_role(role: str) -> re.Pattern[str]:
+    return re.compile(
+        rf'("{role}"\s*:\s*\{{.*?"prompt"\s*:\s*)("(?:\\.|[^"\\])*")(\s*,\s*"tools")',
+        re.S,
+    )
 
 
 @dataclass
@@ -23,6 +27,7 @@ class OpencodePolicySyncResult:
     path: str
     created: bool
     updated: bool
+    updated_roles: list[str]
     message: str
 
 
@@ -30,12 +35,35 @@ class OpencodePolicySyncError(RuntimeError):
     """Raised when local opencode policy cannot be synchronized."""
 
 
-def sync_opencode_build_policy(
+def _replace_role_prompt(raw_text: str, role: str) -> tuple[str, bool]:
+    pattern = _prompt_regex_for_role(role)
+    match = pattern.search(raw_text)
+    if not match:
+        return raw_text, False
+
+    prefix, quoted_prompt, suffix = match.groups()
+    try:
+        current_prompt = json.loads(quoted_prompt)
+    except json.JSONDecodeError as exc:
+        raise OpencodePolicySyncError(
+            f"agent.{role}.prompt is not a valid JSON string"
+        ) from exc
+
+    synchronized_prompt = apply_agent_prompt_layers(role, current_prompt)
+    if synchronized_prompt == current_prompt:
+        return raw_text, False
+
+    replacement = f"{prefix}{json.dumps(synchronized_prompt)}{suffix}"
+    updated = raw_text[: match.start()] + replacement + raw_text[match.end() :]
+    return updated, True
+
+
+def sync_opencode_agent_policy(
     opencode_path: Path,
     *,
     create_if_missing: bool = True,
 ) -> OpencodePolicySyncResult:
-    """Ensure local opencode build prompt contains checkpoint policy text."""
+    """Ensure local opencode prompts contain current layered agent policies."""
     target = opencode_path.resolve()
     created = False
 
@@ -50,45 +78,40 @@ def sync_opencode_build_policy(
         created = True
 
     raw = target.read_text(encoding="utf-8")
-    match = _BUILD_PROMPT_RE.search(raw)
-    if not match:
-        raise OpencodePolicySyncError(
-            "Could not locate agent.build.prompt in opencode.jsonc. "
-            "Please ensure the file follows generated structure."
-        )
+    updated_roles: list[str] = []
+    updated_raw = raw
 
-    prefix, quoted_prompt, suffix = match.groups()
-    try:
-        current_prompt = json.loads(quoted_prompt)
-    except json.JSONDecodeError as exc:
-        raise OpencodePolicySyncError("agent.build.prompt is not a valid JSON string") from exc
+    for role in AGENT_ROLES:
+        updated_raw, role_updated = _replace_role_prompt(updated_raw, role)
+        if role_updated:
+            updated_roles.append(role)
 
-    synchronized_prompt = ensure_builder_checkpoint_policy(current_prompt)
-    if synchronized_prompt == current_prompt:
+    if not updated_roles:
         if created:
             return OpencodePolicySyncResult(
                 path=str(target),
                 created=True,
                 updated=True,
-                message="Created opencode.jsonc with synchronized checkpoint policy.",
+                updated_roles=[],
+                message="Created opencode.jsonc with synchronized agent collaboration policies.",
             )
         return OpencodePolicySyncResult(
             path=str(target),
             created=False,
             updated=False,
-            message="opencode.jsonc build policy already up to date.",
+            updated_roles=[],
+            message="opencode.jsonc agent policies already up to date.",
         )
 
-    replacement = f"{prefix}{json.dumps(synchronized_prompt)}{suffix}"
-    updated_raw = raw[: match.start()] + replacement + raw[match.end() :]
     target.write_text(updated_raw, encoding="utf-8")
     return OpencodePolicySyncResult(
         path=str(target),
         created=created,
         updated=True,
+        updated_roles=updated_roles,
         message=(
-            "Created and synchronized opencode.jsonc build policy."
+            "Created and synchronized opencode.jsonc agent policies."
             if created
-            else "Synchronized opencode.jsonc build policy."
+            else "Synchronized opencode.jsonc agent policies."
         ),
     )

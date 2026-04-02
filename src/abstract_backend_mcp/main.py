@@ -330,14 +330,14 @@ def builder_checkpoint_run(
     help="Create opencode.jsonc from template if missing.",
 )
 def sync_opencode_policy(opencode_path: str, create_if_missing: bool) -> None:
-    """Synchronize local opencode build prompt with versioned checkpoint policy."""
+    """Synchronize local opencode prompts with layered agent policies."""
     from abstract_backend_mcp.core.opencode_policy_sync import (
         OpencodePolicySyncError,
-        sync_opencode_build_policy,
+        sync_opencode_agent_policy,
     )
 
     try:
-        result = sync_opencode_build_policy(
+        result = sync_opencode_agent_policy(
             Path(opencode_path),
             create_if_missing=create_if_missing,
         )
@@ -348,6 +348,8 @@ def sync_opencode_policy(opencode_path: str, create_if_missing: bool) -> None:
     click.echo(f"Path: {result.path}")
     click.echo(f"Created: {'yes' if result.created else 'no'}")
     click.echo(f"Updated: {'yes' if result.updated else 'no'}")
+    if result.updated_roles:
+        click.echo(f"Updated roles: {', '.join(result.updated_roles)}")
 
 
 if __name__ == "__main__":

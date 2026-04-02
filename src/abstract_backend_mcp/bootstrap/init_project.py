@@ -12,6 +12,7 @@ import click
 from jinja2 import Environment, PackageLoader
 
 from abstract_backend_mcp.bootstrap.detect_project import detect_project
+from abstract_backend_mcp.core.build_policy import ensure_builder_checkpoint_policy
 from abstract_backend_mcp.core.logging import get_logger
 
 logger = get_logger()
@@ -166,33 +167,6 @@ Very important:
 - do not perform large refactors unless they are clearly required.
 
 If you need to deviate from the plan, explain why.
-
-## Mandatory checkpoint workflow (before and after implementation)
-
-Before any file modification, you MUST ask the user:
-- "¿Crear checkpoint antes de implementar? (sí/no)"
-
-Behavior:
-- If user answers "no": implement directly over current state.
-- If user answers "sí": run `poetry run abstract-mcp builder-checkpoint start` before editing files.
-  - This command auto-commits pending changes with exact message `checkpoint pre-build` when needed.
-  - If sensitive-looking files are detected, start may fail unless explicitly allowed with `--allow-sensitive-autocommit`.
-  - It stores checkpoint metadata in `.git` and anchors the checkpoint to a concrete commit SHA.
-
-Before starting a new implementation step, check existing session state with:
-- `poetry run abstract-mcp builder-checkpoint status`
-
-After implementation finishes (including when implementation fails midway), if a checkpoint session was started, you MUST ask:
-- "¿Conservar cambios o revertir al checkpoint?"
-
-Behavior:
-- If user chooses "conservar": run `poetry run abstract-mcp builder-checkpoint finalize --action keep`
-  - Never auto-commit as part of "conservar".
-- If user chooses "revertir": ask for explicit confirmation `REVERTIR`, then run:
-  - `poetry run abstract-mcp builder-checkpoint finalize --action revert --confirm-revert REVERTIR`
-  - If branch changed since checkpoint and user explicitly wants to force revert, add `--allow-cross-branch-revert`.
-
-Do not skip this workflow. It is mandatory whenever code implementation is requested.
 
 ## Output requirements
 
@@ -842,6 +816,33 @@ def _load_repo_audit_prompt() -> str:
         return _DEFAULT_AUDIT_PROMPT
 
 
+def get_default_agent_prompts() -> dict[str, str]:
+    """Return default agent prompts used by templates and policy sync tooling."""
+    return {
+        "audit_prompt": _load_repo_audit_prompt(),
+        "builder_prompt": ensure_builder_checkpoint_policy(_BUILDER_PROMPT),
+        "fix_prompt": _FIX_PROMPT,
+        "doc_prompt": _DOC_PROMPT,
+        "plan_prompt": _PLAN_PROMPT,
+    }
+
+
+def render_opencode_content(target_dir: str | Path = ".") -> str:
+    """Render opencode.jsonc content for a given target directory."""
+    root = Path(target_dir).resolve()
+    info = detect_project(root)
+    render_ctx = {
+        **info,
+        **get_default_agent_prompts(),
+    }
+    env = Environment(
+        loader=PackageLoader("abstract_backend_mcp", "templates"),
+        keep_trailing_newline=True,
+    )
+    tmpl = env.get_template("opencode.jsonc.j2")
+    return tmpl.render(**render_ctx)
+
+
 def run_init(target_dir: str = ".", dry_run: bool = False) -> list[str]:
     """Generate bootstrap files in *target_dir*.
 
@@ -852,11 +853,7 @@ def run_init(target_dir: str = ".", dry_run: bool = False) -> list[str]:
     info = detect_project(root)
     render_ctx = {
         **info,
-        "audit_prompt": _load_repo_audit_prompt(),
-        "builder_prompt": _BUILDER_PROMPT,
-        "fix_prompt": _FIX_PROMPT,
-        "doc_prompt": _DOC_PROMPT,
-        "plan_prompt": _PLAN_PROMPT,
+        **get_default_agent_prompts(),
     }
 
     env = Environment(

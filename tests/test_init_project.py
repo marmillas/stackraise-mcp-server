@@ -50,3 +50,5 @@ def test_run_init_generates_updated_stackraise_configs(tmp_path):
     )
     assert "senior technical writer and software documentation engineer" in opencode
     assert "senior software planning and problem-solving engineer" in opencode
+    assert "builder-checkpoint run" in opencode
+    assert "REVERTIR" in opencode

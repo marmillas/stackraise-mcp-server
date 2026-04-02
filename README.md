@@ -372,9 +372,11 @@ The generated `opencode.jsonc` also includes an `agent` block with predefined pr
 The CLI includes a checkpoint helper for builder sessions:
 
 - `poetry run abstract-mcp builder-checkpoint start`
+- `poetry run abstract-mcp builder-checkpoint run --on-success keep --on-failure ask -- <command ...>`
 - `poetry run abstract-mcp builder-checkpoint status`
 - `poetry run abstract-mcp builder-checkpoint finalize --action keep`
 - `poetry run abstract-mcp builder-checkpoint finalize --action revert --confirm-revert REVERTIR`
+- `poetry run abstract-mcp sync-opencode-policy`
 
 Behavior:
 
@@ -384,10 +386,18 @@ Behavior:
   default. Use `--allow-sensitive-autocommit` only when explicitly intended.
 - It stores checkpoint metadata in `.git/abstract_builder_checkpoint_session.json`
   and uses lock/atomic writes to reduce race and corruption risks.
+- `run` is the transactional wrapper that enforces start/execute/finalize flow with
+  explicit success/failure policies.
 - On `finalize --action revert`, it performs `git reset --hard <base_head_sha>` and
   `git clean -fd` after confirmation.
 - Revert is blocked by default if current branch differs from checkpoint branch.
   Override only explicitly with `--allow-cross-branch-revert`.
+- `sync-opencode-policy` updates (or creates) local `opencode.jsonc` from versioned
+  policy source so ignored runtime configs remain reproducible.
+
+Recommended operational step after pull/init:
+
+- `poetry run abstract-mcp sync-opencode-policy`
 
 ## Limitations (v1)
 
